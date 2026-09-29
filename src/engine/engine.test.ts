@@ -174,6 +174,13 @@ describe('projection', () => {
     expect(runProjection(q, { now: NOW }).rows.find((r) => r.age === 56)!.preMedicare).toBeGreaterThan(0);
   });
 
+  it('reports mortgage payments separately from other debt', () => {
+    const r = runProjection(samplePlan(NOW), { now: NOW }).rows[1];
+    const mortgage = samplePlan(NOW).debts.find((d) => d.type === 'mortgage')!;
+    expect(r.mortgagePayments).toBeCloseTo(mortgage.monthlyPayment * 12, -1);
+    expect(r.debtPayments - r.mortgagePayments).toBeGreaterThan(0); // the car loan
+  });
+
   it('pays retirement healthcare from the HSA first, tax-free', () => {
     const p: Plan = { ...emptyPlan(), married: false, lifeExpectancy: 70, retirementSpending: 40_000 };
     p.self = { ...p.self, birthYear: 1961, retirementAge: 60 };

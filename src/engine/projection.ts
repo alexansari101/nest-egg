@@ -40,6 +40,8 @@ export interface YearRow {
   hsaNonQualified: number;
   agi: number;
   debtPayments: number;
+  /** The part of debtPayments that goes to mortgages. */
+  mortgagePayments: number;
   debtInterest: number;
   /** California property tax on your homes (Prop 13). */
   propertyTax: number;
@@ -246,7 +248,7 @@ export function runProjection(
       wages: 0, socialSecurity: 0, otherIncome: 0, eventsIn: 0, eventsOut: 0,
       contributions: 0, employerContributions: 0, spending: 0, healthcare: 0,
       preMedicare: 0, medicare: 0, irmaa: 0, ltc: 0, hsaNonQualified: 0, agi: 0,
-      debtPayments: 0, debtInterest: 0, propertyTax: 0, homeUpkeep: 0, hsaMedical: 0, federalItemized: false, federalDeduction: 0, taxes: 0, federalTax: 0, stateTax: 0, payrollTax: 0,
+      debtPayments: 0, mortgagePayments: 0, debtInterest: 0, propertyTax: 0, homeUpkeep: 0, hsaMedical: 0, federalItemized: false, federalDeduction: 0, taxes: 0, federalTax: 0, stateTax: 0, payrollTax: 0,
       penalty: 0, withdrawals: 0, withdrawalsByType: emptyByType(), rmd: 0, realizedGains: 0,
       surplus: 0, surplusInvested: 0, surplusTo401k: 0, surplusToHSA: 0, surplusToBrokerage: 0, shortfall: 0,
       ...partial,
@@ -353,6 +355,7 @@ export function runProjection(
 
     // --- Debts
     let debtPayments = 0;
+    let mortgagePayments = 0;
     let debtInterest = 0;
     let mortgageInterest = 0;
     let mortgageBalance = 0;
@@ -363,6 +366,7 @@ export function runProjection(
       if (d.type === 'mortgage') {
         mortgageInterest += res.interest;
         mortgageBalance += (startBal + res.balance) / 2;
+        mortgagePayments += res.paid;
       }
       debtBal[d.id] = res.balance;
       debtPayments += res.paid;
@@ -604,7 +608,7 @@ export function runProjection(
         contributions, employerContributions, spending, healthcare,
         preMedicare: hc.preMedicare, medicare: hc.medicare, irmaa: hc.irmaa, ltc: hc.ltc,
         hsaNonQualified: alloc.hsaNonQ, agi: tx.t.agi,
-        debtPayments, debtInterest, taxes, propertyTax, homeUpkeep, hsaMedical,
+        debtPayments, mortgagePayments, debtInterest, taxes, propertyTax, homeUpkeep, hsaMedical,
         federalItemized: tx.t.federalItemized, federalDeduction: tx.t.federalDeduction,
         federalTax: tx.t.federal,
         stateTax: tx.t.state,

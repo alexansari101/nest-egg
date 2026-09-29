@@ -189,7 +189,8 @@ export default function Dashboard() {
               parts={[
                 { label: 'Taxes', value: next.taxes, color: c.series[6] },
                 { label: 'Your retirement & savings contributions', value: next.contributions, color: c.series[0] },
-                { label: 'Debt payments', value: next.debtPayments, color: c.debt },
+                { label: 'Mortgage', value: next.mortgagePayments, color: c.debt },
+                { label: 'Other debt payments', value: next.debtPayments - next.mortgagePayments, color: c.series[1] },
                 { label: 'Property tax & upkeep', value: next.propertyTax + next.homeUpkeep, color: c.type.property },
                 { label: 'Living expenses', value: next.spending + next.eventsOut, color: c.series[3] },
                 { label: 'Leftover → 401(k) & HSA top-ups', value: next.surplusTo401k + next.surplusToHSA, color: c.series[4] },

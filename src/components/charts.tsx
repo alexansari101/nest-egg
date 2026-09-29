@@ -237,11 +237,14 @@ export function FanChart({ mc, retireAge, c, height = 320 }: { mc: MonteCarloRes
 
 const WD_TYPES: AccountType[] = ['cash', 'taxable', 'traditional', 'roth', 'hsa', 'other'];
 
+export type PaycheckView = 'sources' | 'uses';
+
 export function IncomeSourcesChart({
-  projection, real, c, fromAge, height = 340,
-}: { projection: ProjectionResult; real: boolean; c: ChartTheme; fromAge?: number; height?: number }) {
+  projection, real, c, fromAge, height = 340, view = 'sources',
+}: { projection: ProjectionResult; real: boolean; c: ChartTheme; fromAge?: number; height?: number; view?: PaycheckView }) {
   const start = fromAge ?? projection.rows[projection.retireIndex]?.age ?? 0;
   const rows = projection.rows.filter((r) => r.k > 0 && r.age >= start);
+  if (view === 'uses') return <PaycheckUsesChart rows={rows} real={real} c={c} height={height} />;
   const keys = [
     { key: 'wages', label: 'Wages', color: c.wages },
     { key: 'ss', label: 'Social Security', color: c.ss },
@@ -263,7 +266,8 @@ export function IncomeSourcesChart({
       healthcare: (r.healthcare - r.ltc) / d,
       ltc: r.ltc / d,
       taxes: r.taxes / d,
-      debt: r.debtPayments / d,
+      mortgage: r.mortgagePayments / d,
+      debt: (r.debtPayments - r.mortgagePayments) / d,
       shortfall: r.shortfall / d,
       reinvested: r.surplusInvested / d,
     };
@@ -288,7 +292,8 @@ export function IncomeSourcesChart({
               rs.push({ label: 'Living expenses', value: p.spending });
               if (p.healthcare > 1) rs.push({ label: 'Healthcare', value: p.healthcare });
               if (p.ltc > 1) rs.push({ label: 'Long-term care', value: p.ltc });
-              if (p.debt > 1) rs.push({ label: 'Debt payments', value: p.debt });
+              if (p.mortgage > 1) rs.push({ label: 'Mortgage', value: p.mortgage });
+              if (p.debt > 1) rs.push({ label: 'Other debt payments', value: p.debt });
               if (p.propertyTax > 1) rs.push({ label: 'Property tax', value: p.propertyTax });
               if (p.upkeep > 1) rs.push({ label: 'Home upkeep', value: p.upkeep });
               rs.push({ label: 'Income taxes', value: p.taxes });
@@ -302,6 +307,67 @@ export function IncomeSourcesChart({
             <Bar key={k.key} dataKey={k.key} stackId="s" fill={k.color} isAnimationActive={false} maxBarSize={24} radius={i === used.length - 1 ? [4, 4, 0, 0] : 0} stroke={c.surface} strokeWidth={1} />
           ))}
           <Line type="stepAfter" dataKey="need" stroke={c.ink} strokeWidth={2} dot={false} isAnimationActive={false} activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Where each year's money goes: one stacked segment per kind of expense. */
+function PaycheckUsesChart({ rows, real, c, height }: { rows: YearRow[]; real: boolean; c: ChartTheme; height: number }) {
+  const keys = [
+    { key: 'living', label: 'Living expenses', color: c.wages },
+    { key: 'healthcare', label: 'Healthcare', color: c.series[2] },
+    { key: 'mortgage', label: 'Mortgage', color: c.debt },
+    { key: 'debt', label: 'Other debt', color: c.series[1] },
+    { key: 'home', label: 'Property tax & upkeep', color: c.type.property },
+    { key: 'taxes', label: 'Income taxes', color: c.series[6] },
+    { key: 'oneTime', label: 'One-time spending', color: c.series[3] },
+    { key: 'saving', label: 'Saving & reinvested', color: c.series[0] },
+    { key: 'leftover', label: 'Leftover (spent)', color: c.series[4] },
+  ];
+  const data = rows.map((r) => {
+    const d = real ? r.inflation : 1;
+    return {
+      age: r.age,
+      year: r.year,
+      living: (r.spending - r.healthcare) / d,
+      healthcare: r.healthcare / d,
+      mortgage: r.mortgagePayments / d,
+      debt: (r.debtPayments - r.mortgagePayments) / d,
+      home: (r.propertyTax + r.homeUpkeep) / d,
+      taxes: r.taxes / d,
+      oneTime: r.eventsOut / d,
+      saving: (r.contributions + r.surplusInvested) / d,
+      leftover: (r.surplus - r.surplusInvested) / d,
+      available: (r.wages + r.socialSecurity + r.otherIncome + r.eventsIn + r.withdrawals) / d,
+      shortfall: r.shortfall / d,
+    } as Record<string, number>;
+  });
+  const used = keys.filter((k) => data.some((d) => d[k.key] > 1));
+  return (
+    <div>
+      <Legend items={[...used.map((k) => ({ label: k.label, color: k.color })), { label: 'Money available (income + withdrawals)', color: c.ink, kind: 'line' }]} />
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={data} margin={{ top: 16, right: 16, bottom: 4, left: 0 }} barCategoryGap="12%">
+          <CartesianGrid stroke={c.grid} vertical={false} />
+          <XAxis dataKey="age" {...axisProps(c)} interval="preserveStartEnd" minTickGap={20} />
+          <YAxis {...yAxisProps(c)} />
+          <Tooltip
+            cursor={{ fill: c.grid, fillOpacity: 0.5 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const p = payload[0].payload as Record<string, number>;
+              const rs: TipRow[] = [...used].reverse().filter((k) => p[k.key] > 1).map((k) => ({ label: k.label, value: p[k.key], color: k.color }));
+              rs.push({ label: 'Money available', value: p.available, color: c.ink, kind: 'line', strong: true });
+              if (p.shortfall > 1) rs.push({ label: 'Shortfall', value: p.shortfall, color: c.critical, strong: true });
+              return <TipBox title={`Age ${p.age} · ${p.year}${real ? " · today's $" : ''}`} rows={rs} />;
+            }}
+          />
+          {used.map((k, i) => (
+            <Bar key={k.key} dataKey={k.key} stackId="u" fill={k.color} isAnimationActive={false} maxBarSize={24} radius={i === used.length - 1 ? [4, 4, 0, 0] : 0} stroke={c.surface} strokeWidth={1} />
+          ))}
+          <Line type="stepAfter" dataKey="available" stroke={c.ink} strokeWidth={2} dot={false} isAnimationActive={false} activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

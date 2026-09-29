@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useApp } from '../App';
 import { usePlan } from '../store';
 import { Button, Card, Empty, Segmented, Slider, StatTile, Toggle } from '../components/ui';
-import { BalanceSheetChart, FanChart, HealthcareChart, IncomeSourcesChart, TaxesOverTime } from '../components/charts';
+import { BalanceSheetChart, FanChart, HealthcareChart, IncomeSourcesChart, TaxesOverTime, type PaycheckView } from '../components/charts';
 import { fmtCompact, fmtPct, fmtUSD } from '../format';
 import { successLabel, successTone, StatusIcon, isEmptyPlan } from './Dashboard';
 import type { YearRow } from '../engine/projection';
@@ -14,7 +14,7 @@ function toCSV(rows: YearRow[], real: boolean): string {
     ['Wages', (r) => r.wages], ['Social Security', (r) => r.socialSecurity], ['Other income', (r) => r.otherIncome + r.eventsIn],
     ['Contributions (yours)', (r) => r.contributions], ['Employer contributions', (r) => r.employerContributions],
     ['Living expenses', (r) => r.spending - r.healthcare],
-    ['Healthcare (pre-65 insurance)', (r) => r.preMedicare], ['Medicare', (r) => r.medicare], ['IRMAA', (r) => r.irmaa], ['Long-term care', (r) => r.ltc], ['One-time spending', (r) => r.eventsOut], ['Debt payments', (r) => r.debtPayments], ['Property tax', (r) => r.propertyTax], ['Home upkeep', (r) => r.homeUpkeep], ['HSA paid medical', (r) => r.hsaMedical], ['Itemized federal deduction', (r) => (r.federalItemized ? r.federalDeduction : 0)],
+    ['Healthcare (pre-65 insurance)', (r) => r.preMedicare], ['Medicare', (r) => r.medicare], ['IRMAA', (r) => r.irmaa], ['Long-term care', (r) => r.ltc], ['One-time spending', (r) => r.eventsOut], ['Mortgage payments', (r) => r.mortgagePayments], ['Other debt payments', (r) => r.debtPayments - r.mortgagePayments], ['Property tax', (r) => r.propertyTax], ['Home upkeep', (r) => r.homeUpkeep], ['HSA paid medical', (r) => r.hsaMedical], ['Itemized federal deduction', (r) => (r.federalItemized ? r.federalDeduction : 0)],
     ['Federal tax', (r) => r.federalTax], ['CA tax', (r) => r.stateTax], ['Payroll tax', (r) => r.payrollTax], ['Penalty', (r) => r.penalty],
     ['Withdrawals', (r) => r.withdrawals], ['RMD', (r) => r.rmd], ['Surplus invested', (r) => r.surplusInvested], ['Shortfall', (r) => r.shortfall],
     ['Spendable assets', (r) => r.liquid], ['Total assets', (r) => r.assets], ['Debt', (r) => r.totalDebt], ['Net worth', (r) => r.netWorth],
@@ -34,6 +34,7 @@ export default function Projections() {
   const { projection: pr, mc } = sim;
   const [includeHome, setIncludeHome] = useState(true);
   const [showTable, setShowTable] = useState(false);
+  const [paycheckView, setPaycheckView] = useState<PaycheckView>('sources');
   const age0 = pr.currentAge;
   const d = (r: YearRow, v: number) => (real ? v / r.inflation : v);
   const retire = pr.rows[pr.retireIndex];
@@ -116,8 +117,12 @@ export default function Projections() {
         {mc ? <FanChart mc={mc} retireAge={plan.self.retirementAge} c={c} /> : <div className="chart-skeleton" />}
       </Card>
 
-      <Card title="Retirement paycheck" subtitle={`Where each year's money comes from vs. what you need (living costs, healthcare, property tax & upkeep, debt, income taxes and any saving)${real ? " · today's $" : ''}`}>
-        <IncomeSourcesChart projection={pr} real={real} c={c} fromAge={Math.max(age0 + 1, plan.self.retirementAge - 3)} />
+      <Card
+        title="Retirement paycheck"
+        subtitle={`${paycheckView === 'sources' ? "Where each year's money comes from vs. what you need" : "Where each year's money goes: living costs, healthcare, mortgage, other debt, home costs, taxes and saving"}${real ? " · today's $" : ''}`}
+        actions={<Segmented value={paycheckView} onChange={setPaycheckView} options={[{ value: 'sources', label: 'Where it comes from' }, { value: 'uses', label: 'Where it goes' }]} />}
+      >
+        <IncomeSourcesChart projection={pr} real={real} c={c} view={paycheckView} fromAge={Math.max(age0 + 1, plan.self.retirementAge - 3)} />
       </Card>
 
       <Card
@@ -146,7 +151,7 @@ export default function Projections() {
             <table className="table data-table">
               <thead>
                 <tr>
-                  <th>Age</th><th>Year</th><th>Income</th><th>Taxes</th><th>Spending</th><th>Healthcare</th><th>Debt pmts</th><th>Home costs</th><th>Saved</th><th>Withdrawn</th><th>Spendable</th><th>Debt</th><th>Net worth</th>
+                  <th>Age</th><th>Year</th><th>Income</th><th>Taxes</th><th>Spending</th><th>Healthcare</th><th>Mortgage</th><th>Other debt</th><th>Home costs</th><th>Saved</th><th>Withdrawn</th><th>Spendable</th><th>Debt</th><th>Net worth</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +163,8 @@ export default function Projections() {
                     <td>{fmtUSD(d(r, r.taxes))}</td>
                     <td>{fmtUSD(d(r, r.spending - r.healthcare + r.eventsOut))}</td>
                     <td>{fmtUSD(d(r, r.healthcare))}</td>
-                    <td>{fmtUSD(d(r, r.debtPayments))}</td>
+                    <td>{fmtUSD(d(r, r.mortgagePayments))}</td>
+                    <td>{fmtUSD(d(r, r.debtPayments - r.mortgagePayments))}</td>
                     <td title="Property tax + upkeep">{fmtUSD(d(r, r.propertyTax + r.homeUpkeep))}</td>
                     <td>{fmtUSD(d(r, r.contributions + r.employerContributions + r.surplusInvested))}</td>
                     <td>{fmtUSD(d(r, r.withdrawals))}</td>
