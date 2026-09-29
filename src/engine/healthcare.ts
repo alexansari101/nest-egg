@@ -1,8 +1,11 @@
 // Healthcare costs in retirement.
 //
-// - Before 65: once nobody in the household has employer coverage, each person under 65
-//   buys private insurance (e.g. Covered California) and pays out-of-pocket costs.
-// - From 65: Medicare Part B + Part D + a Medigap plan + dental/vision/out-of-pocket.
+// - While either spouse earns a paycheck, the whole family is on that employer plan (its
+//   premiums and out-of-pocket costs are part of living expenses), whatever their ages. People
+//   65+ covered by a large employer's plan can delay Medicare without penalty.
+// - Once nobody has employer coverage: each person under 65 buys private insurance
+//   (e.g. Covered California); each person 65+ is on Medicare Part B + Part D + a Medigap
+//   plan + dental/vision/out-of-pocket.
 // - IRMAA: Medicare's income surcharge on Parts B and D, set by MAGI from two years earlier.
 // - Long-term care: an optional stress test (N years of care starting at an age).
 // Everything rises at inflation plus the healthcare premium (medical costs have
@@ -46,6 +49,7 @@ export function healthcareYear(opts: {
   h: HealthcarePlan;
   married: boolean;
   ages: number[]; // [you, spouse?]
+  /** Someone in the household has a paycheck with employer health coverage. */
   anyoneWorking: boolean;
   yourAge: number;
   magiTwoYearsAgo: number | null;
@@ -57,6 +61,7 @@ export function healthcareYear(opts: {
   let medicare = 0;
   let onMedicare = 0;
   for (const a of ages) {
+    if (opts.anyoneWorking) continue; // everyone on the working spouse's employer plan
     if (a >= MEDICARE_AGE) {
       medicare += h.medicarePerPerson * hcf;
       onMedicare++;

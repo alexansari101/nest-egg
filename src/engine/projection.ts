@@ -339,7 +339,8 @@ export function runProjection(
       h: plan.healthcare,
       married,
       ages: married ? [age, sAge!] : [age],
-      anyoneWorking: selfWorking || spouseWorking,
+      // Coverage comes from a paycheck: a spouse with no income doesn't provide it.
+      anyoneWorking: (selfWorking && plan.self.income > 0) || (spouseWorking && plan.spouse.income > 0),
       yourAge: age,
       magiTwoYearsAgo: agiByK[k - 2] ?? agiByK[k - 1] ?? null,
       hcf: f * hcPremium[k],

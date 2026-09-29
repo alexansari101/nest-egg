@@ -38,13 +38,17 @@ export function buildMilestones(plan: Plan, pr: ProjectionResult): Milestone[] {
     const a = pr.debtPayoffAge[d.id];
     if (a != null && a > pr.currentAge) add('self', a, 'debt', `${d.name} paid off`);
   }
+  // Last year anyone has a paycheck with employer health coverage.
+  const coverageEndYear = Math.max(0, ...people.filter((w) => plan[w].income > 0).map((w) => plan[w].birthYear + plan[w].retirementAge));
   for (const who of people) {
     const p = plan[who];
     const name = who === 'self' ? 'You' : spouseName;
     add(who, p.retirementAge, 'retire', who === 'self' ? 'You retire' : `${name} retires`);
     if (benefitAtClaim(plan, who).monthly > 0)
       add(who, p.ssClaimAge, 'ss', who === 'self' ? 'Your Social Security begins' : `${name}'s Social Security begins`);
-    add(who, MEDICARE_AGE, 'medicare', who === 'self' ? 'Your Medicare begins' : `${name}'s Medicare begins`);
+    // Medicare starts at 65, or later if a working spouse's employer plan still covers you.
+    const medicareAge = Math.max(MEDICARE_AGE, coverageEndYear - p.birthYear);
+    add(who, medicareAge, 'medicare', who === 'self' ? 'Your Medicare begins' : `${name}'s Medicare begins`);
     const hasPretax = allAccounts.some((a) => a.type === 'traditional' && (who === 'spouse' ? a.owner === 'spouse' : a.owner !== 'spouse' || !plan.married));
     if (hasPretax) {
       add(who, rmdStartAge(p.birthYear), 'rmd', who === 'self' ? 'Your required minimum distributions start' : `${name}'s required minimum distributions start`);

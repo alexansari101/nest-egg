@@ -110,6 +110,7 @@ describe('projection', () => {
     const p: Plan = { ...emptyPlan(), married: false, lifeExpectancy: 45 };
     p.self = { ...p.self, birthYear: 1991, retirementAge: 80 };
     p.accounts = [{ ...newAccount('taxable', 100_000, '2026-09-27'), allocation: 'custom', returnRate: 10, volatility: 0 }];
+    p.healthcare = { ...defaultHealthcare(), pre65PerPerson: 0, medicarePerPerson: 0 }; // pure growth, no costs
     const r = runProjection(p, { now: NOW });
     expect(r.rows[0].liquid).toBe(100_000);
     expect(r.rows[10].liquid).toBeCloseTo(100_000 * 1.1 ** 10, 0);
@@ -121,6 +122,7 @@ describe('projection', () => {
     expect(medianReturn(0.08, 0.16)).toBeCloseTo(0.0683, 3);
     const p: Plan = { ...emptyPlan(), married: false, lifeExpectancy: 65 };
     p.self = { ...p.self, birthYear: 1991, retirementAge: 90 };
+    p.healthcare = { ...defaultHealthcare(), pre65PerPerson: 0, medicarePerPerson: 0 }; // pure growth, no costs
     p.accounts = [{ ...newAccount('taxable', 100_000, '2026-09-27'), allocation: 100 }];
     const det = runProjection(p, { now: NOW }).rows.at(-1)!.liquid;
     const mc = runMonteCarlo(p, 2000, 7, NOW);
@@ -152,6 +154,24 @@ describe('projection', () => {
       const l = shockLoadings(acct, A, 40, 60);
       expect(l.s ** 2 + l.b ** 2 + l.i ** 2).toBeCloseTo(1, 6);
     }
+  });
+
+  it('keeps the family on the working spouse\'s plan and starts Medicare when it ends', () => {
+    const p = samplePlan(NOW);
+    p.self = { ...p.self, birthYear: 1988, retirementAge: 55 };
+    p.spouse = { ...p.spouse, birthYear: 1985, retirementAge: 70 };
+    const rows = runProjection(p, { now: NOW }).rows;
+    const at = (age: number) => rows.find((r) => r.age === age)!;
+    // You're retired from 55 but covered by your spouse's plan, even after your spouse turns 65.
+    for (const age of [55, 60, 64, 66]) expect(at(age).healthcare).toBe(0);
+    // Spouse retires at 70 (you're 67): both on Medicare from then on.
+    expect(at(67).medicare).toBeGreaterThan(0);
+    expect(at(67).preMedicare).toBe(0);
+    // A spouse with no paycheck doesn't provide employer coverage.
+    const ms = buildMilestones(p, runProjection(p, { now: NOW })).filter((m) => m.kind === 'medicare');
+    expect(ms.map((m) => m.year)).toEqual([2055, 2055]); // both when the spouse retires (spouse 70, you 67)
+    const q = { ...p, spouse: { ...p.spouse, income: 0 } };
+    expect(runProjection(q, { now: NOW }).rows.find((r) => r.age === 56)!.preMedicare).toBeGreaterThan(0);
   });
 
   it('pays retirement healthcare from the HSA first, tax-free', () => {
@@ -459,6 +479,8 @@ describe('healthcare', () => {
 
   it('charges private insurance before 65 only once nobody has employer coverage', () => {
     expect(healthcareYear({ ...base, ages: [60, 58], yourAge: 60, anyoneWorking: true }).total).toBe(0);
+    // A working spouse's plan also covers people 65+ (Medicare delayed) — no Medicare or IRMAA.
+    expect(healthcareYear({ ...base, ages: [66, 63], yourAge: 66, anyoneWorking: true, magiTwoYearsAgo: 900_000 }).total).toBe(0);
     expect(healthcareYear({ ...base, ages: [60, 58], yourAge: 60 }).preMedicare).toBe(2 * h.pre65PerPerson);
   });
 
