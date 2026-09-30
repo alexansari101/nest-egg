@@ -2,6 +2,55 @@
 
 A local, private web app for tracking accounts and debts over time and projecting net worth and retirement readiness. Taxes are modeled for a married couple filing jointly in San Francisco, CA.
 
+## Screenshots
+
+All screenshots show the built-in sample household (a married couple in San Francisco), in today's dollars.
+
+### Overview
+
+Net worth, investable assets, plan success, and sustainable spending at a glance, with a net worth chart that joins your recorded history to the projection, a breakdown of where the next 12 months of income goes, and a milestone timeline.
+
+![Overview](docs/screenshots/overview.png)
+
+### Projections
+
+The projected balance sheet stacks assets by type with debt below the line, and the range-of-outcomes chart shows the spread across hundreds of simulated markets. Drag the "What if…" sliders to see them update live.
+
+![Projected balance sheet](docs/screenshots/balance-sheet.png)
+
+![Range of outcomes](docs/screenshots/range-of-outcomes.png)
+
+The retirement paycheck chart switches between where each year's money comes from and where it goes: living expenses, healthcare, the mortgage as its own line, home costs, income taxes and saving.
+
+![Retirement paycheck](docs/screenshots/retirement-paycheck.png)
+
+Healthcare is modeled per person: employer coverage, private insurance before 65, Medicare, and income surcharges (IRMAA).
+
+![Healthcare costs](docs/screenshots/healthcare.png)
+
+### Accounts, taxes and history
+
+Each account only needs a type and a balance. Pick what it's invested in and returns come from shared market assumptions.
+
+![Accounts](docs/screenshots/accounts.png)
+
+Federal, California, payroll and property taxes, bracket positions, and 2026 contribution limits.
+
+![Taxes](docs/screenshots/taxes.png)
+
+Record dated balance snapshots to build up history, then see it stacked by account type.
+
+![History](docs/screenshots/history.png)
+
+### Dark mode and phones
+
+The layout adapts to the system theme and to narrow screens.
+
+<p>
+  <img src="docs/screenshots/overview-dark.png" alt="Overview in dark mode" width="620">
+  <img src="docs/screenshots/phone-overview.png" alt="Overview on a phone" width="220">
+</p>
+
 ## Run
 
 ```bash
@@ -38,6 +87,7 @@ npm test                                   # engine unit tests (taxes, amortizat
 npm run dev -- --port 5317 &               # then, with the dev server running:
 node scripts/e2e.mjs                       # end-to-end: update balances, save/open file, persistence, edits
 node scripts/shots.mjs shots               # screenshots of every page, light/dark, desktop/phone
+node scripts/readme-shots.mjs             # regenerates the README screenshots in docs/screenshots
 ```
 
 The browser scripts use `playwright-core` with `/usr/bin/chromium` (override with `CHROME=/path`).
